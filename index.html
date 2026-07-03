@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0"/>
+<meta name="theme-color" content="#3b82f6"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="default"/>
+<meta name="apple-mobile-web-app-title" content="TaskFlow"/>
+<title>TaskFlow</title>
+<link rel="manifest" href="manifest.json"/>
+<link rel="icon" href="icons/icon-192.png"/>
+<link rel="apple-touch-icon" href="icons/icon-192.png"/>
+<link rel="stylesheet" href="css/app.css"/>
+<!-- Tabler icons -->
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.34.0/dist/tabler-icons.min.css"/>
+</head>
+<body>
+
+<!-- ログイン画面 -->
+<div id="loginScreen" class="login-screen">
+  <div class="login-card">
+    <div class="login-logo">
+      <i class="ti ti-layout-dashboard"></i>
+      <span>TaskFlow</span>
+    </div>
+    <p class="login-sub">業務効率化ツール</p>
+    <div id="loginError" class="login-error" style="display:none"></div>
+    <input type="password" id="loginPass" placeholder="パスワードを入力" class="login-input" autocomplete="current-password"/>
+    <button id="loginBtn" class="login-btn">ログイン</button>
+    <p class="login-hint">※ パスワードはGitHub設定ファイルで変更できます</p>
+  </div>
+</div>
+
+<!-- アプリ本体 -->
+<div id="appRoot" class="app" style="display:none">
+
+  <!-- モバイル用オーバーレイ -->
+  <div id="sideOverlay" class="side-overlay" onclick="closeSidebar()"></div>
+
+  <!-- サイドバー -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sb-header">
+      <div class="logo">
+        <i class="ti ti-layout-dashboard"></i>
+        TaskFlow
+      </div>
+      <button class="sb-close" onclick="closeSidebar()" aria-label="サイドバーを閉じる">
+        <i class="ti ti-x"></i>
+      </button>
+    </div>
+
+    <div class="ws-section">
+      <div class="sec-label">
+        ワークスペース
+        <button class="ib" id="addWsBtn" aria-label="ワークスペースを追加"><i class="ti ti-plus"></i></button>
+      </div>
+      <div id="wsList"></div>
+    </div>
+
+    <div class="nav-area">
+      <button class="ni active" data-view="dashboard"><i class="ti ti-layout-dashboard"></i>ダッシュボード</button>
+      <button class="ni" data-view="calendar"><i class="ti ti-calendar"></i>カレンダー</button>
+      <button class="ni" data-view="memo"><i class="ti ti-notes"></i>メモ<span class="bdg" id="memoBdg">0</span></button>
+      <button class="ni" data-view="favorites"><i class="ti ti-star"></i>お気に入り<span class="bdg" id="favBdg">0</span></button>
+      <button class="ni" data-view="pinned"><i class="ti ti-pin"></i>ピン留め<span class="bdg" id="pinBdg">0</span></button>
+
+      <div class="sec-label">
+        プロジェクト
+        <button class="ib" id="addProjBtn" aria-label="プロジェクトを追加"><i class="ti ti-plus"></i></button>
+      </div>
+      <div id="projList"></div>
+
+      <div class="sb-footer">
+        <button class="ni" id="logoutBtn"><i class="ti ti-logout"></i>ログアウト</button>
+        <div class="offline-badge" id="offlineBadge" style="display:none">
+          <i class="ti ti-wifi-off"></i> オフライン
+        </div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- メインエリア -->
+  <main class="main-area">
+    <!-- トップバー -->
+    <div class="topbar">
+      <button class="menu-btn" onclick="openSidebar()" aria-label="メニュー">
+        <i class="ti ti-menu-2"></i>
+      </button>
+      <span class="topbar-title" id="topTitle">ダッシュボード</span>
+      <div id="topActions"></div>
+    </div>
+
+    <!-- タブバー (ダッシュボードのみ) -->
+    <div class="tabbar" id="tabBar" style="display:none">
+      <button class="tab on" data-s="">すべて</button>
+      <button class="tab" data-s="todo">未着手</button>
+      <button class="tab" data-s="wip">進行中</button>
+      <button class="tab" data-s="review">レビュー</button>
+      <button class="tab" data-s="done">完了</button>
+      <button class="tab" data-s="hold">保留</button>
+    </div>
+
+    <!-- フィルターバー -->
+    <div class="fbar" id="filterBar" style="display:none">
+      <div class="sw">
+        <i class="ti ti-search"></i>
+        <input type="text" id="searchInp" placeholder="タスクを検索..."/>
+      </div>
+      <select class="fsel" id="filterTag">
+        <option value="">すべて</option>
+        <option value="blue">開発</option>
+        <option value="amber">マーケ</option>
+        <option value="red">急ぎ</option>
+        <option value="green">完了</option>
+        <option value="gray">その他</option>
+      </select>
+    </div>
+
+    <!-- コンテンツ -->
+    <div class="content" id="mainContent"></div>
+  </main>
+
+  <!-- モバイル下部ナビ -->
+  <nav class="bottom-nav" id="bottomNav">
+    <button class="bn-item active" data-view="dashboard"><i class="ti ti-layout-dashboard"></i><span>ホーム</span></button>
+    <button class="bn-item" data-view="calendar"><i class="ti ti-calendar"></i><span>カレンダー</span></button>
+    <button class="bn-item" data-view="memo"><i class="ti ti-notes"></i><span>メモ</span></button>
+    <button class="bn-item" data-view="favorites"><i class="ti ti-star"></i><span>お気に入り</span></button>
+    <button class="bn-item" onclick="openSidebar()"><i class="ti ti-menu-2"></i><span>メニュー</span></button>
+  </nav>
+
+</div><!-- #appRoot -->
+
+<!-- モーダル群 -->
+<div id="wsModal" class="modal-wrap"><div class="modal"><div class="mttl"><span id="wsMTtl">新しいワークスペース</span><button class="ib" data-close="wsModal" aria-label="閉じる"><i class="ti ti-x"></i></button></div><label class="mlbl">名前</label><input class="minp" id="wsNm" placeholder="例：東京オフィス"/><label class="mlbl">カラー</label><div class="cr" id="wsClrs"></div><div class="mftr"><button class="btn" data-close="wsModal">キャンセル</button><button class="btn btnp" id="svWs">保存する</button></div></div></div>
+
+<div id="projModal" class="modal-wrap"><div class="modal"><div class="mttl"><span id="prMTtl">新しいプロジェクト</span><button class="ib" data-close="projModal" aria-label="閉じる"><i class="ti ti-x"></i></button></div><label class="mlbl">名前</label><input class="minp" id="prNm" placeholder="例：開発"/><label class="mlbl">カラー</label><div class="cr" id="prClrs"></div><div class="mftr"><button class="btn" data-close="projModal">キャンセル</button><button class="btn btnp" id="svPr">保存する</button></div></div></div>
+
+<div id="embModal" class="modal-wrap"><div class="modal"><div class="mttl"><span>URLを埋め込む</span><button class="ib" data-close="embModal" aria-label="閉じる"><i class="ti ti-x"></i></button></div><label class="mlbl">種類</label><select class="minp" id="embType"><option value="url">Webページ / スプレッドシート</option><option value="image-url">画像URL</option></select><label class="mlbl">URL</label><input class="minp" id="embUrl" placeholder="https://..."/><div class="mftr"><button class="btn" data-close="embModal">キャンセル</button><button class="btn btnp" id="doEmb">追加する</button></div></div></div>
+
+<div id="confModal" class="modal-wrap"><div class="modal"><div class="mttl"><span>削除の確認</span><button class="ib" data-close="confModal" aria-label="閉じる"><i class="ti ti-x"></i></button></div><p class="ctxt" id="confTxt"></p><div class="mftr"><button class="btn" data-close="confModal">キャンセル</button><button class="btn btn-danger" id="doConf">削除する</button></div></div></div>
+
+<div id="toast" class="toast" style="display:none"></div>
+
+<script src="js/config.js"></script>
+<script src="js/db.js"></script>
+<script src="js/app.js"></script>
+<script src="js/render.js"></script>
+<script src="js/main.js"></script>
+</body>
+</html>
