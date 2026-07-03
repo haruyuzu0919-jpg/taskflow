@@ -28,9 +28,10 @@ const CONFIG = {
   // falseのままでもlocalStorageにデータが保存されます
   // （複数端末で共有したい場合はtrueにしてください）
   // ===================================================
-  USE_SUPABASE: false,
-  SUPABASE_URL: 'https://YOUR_PROJECT.supabase.co',
-  SUPABASE_KEY: 'YOUR_ANON_KEY',
+  USE_SUPABASE: true,
+SUPABASE_URL: 'https://jsxgsumjayendkhcvhke.supabase.co',
+SUPABASE_KEY: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImpzeGdzdW1qYXllbmRraGN2aGtlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMxMDQyMTEsImV4cCI6MjA5ODY4MDIxMX0.VVaGf_wiQ1su9NHRthzsGygY7M-3bTgoKpR6iIs69iA',
+
 
   // ===================================================
   // アプリ名（変更可能）
