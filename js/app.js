@@ -10,53 +10,33 @@ const MEMO_COLORS = ['#ffffff','#fef9c3','#dbeafe','#d1fae5','#fee2e2','#ede9fe'
 const SL = { todo:'未着手', wip:'進行中', review:'レビュー', done:'完了', hold:'保留' };
 const RL = { none:'なし', daily:'毎日', weekly:'毎週', monthly:'毎月' };
 
-// グローバル状態
 const A = {
-  // 認証
   authed: false,
-
-  // ナビ状態
   wsId: '',
   view: 'dashboard',
-  sf: '',     // ステータスフィルター
-  sq: '',     // 検索クエリ
-  tf: '',     // タグフィルター
-  expId: null,
-  embId: null,
-  ewId: null,
-  epId: null,
-  activeMemoId: null,
-  memoSearch: '',
-  wc: WS_COLORS[1],
-  pc: WS_COLORS[1],
+  sf: '', sq: '', tf: '',
+  expId: null, embId: null, ewId: null, epId: null,
+  activeMemoId: null, memoSearch: '',
+  wc: WS_COLORS[1], pc: WS_COLORS[1],
   confCb: null,
   calYear: new Date().getFullYear(),
   calMonth: new Date().getMonth(),
-
-  // データ
-  workspaces: [],
-  projects: [],
-  tasks: [],
-  memos: [],
+  workspaces: [], projects: [], tasks: [], memos: [],
+  syncInterval: null,
 };
 
-// ユーティリティ
 function uid() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
-
 function tl(t) {
   return { blue:'開発', amber:'マーケ', red:'急ぎ', green:'完了', gray:'その他' }[t] || t;
 }
-
 function aw() {
   return A.workspaces.find(w => w.id === A.wsId) || A.workspaces[0] || { name: '', color: '#3b82f6' };
 }
-
 function wtasks() {
   return A.tasks.filter(t => t.wsId === A.wsId);
 }
-
 function ftasks(arr) {
   let r = arr;
   if (A.sf) r = r.filter(t => t.status === A.sf);
@@ -67,21 +47,19 @@ function ftasks(arr) {
 
 function showToast(msg, dur = 2000) {
   const el = document.getElementById('toast');
+  if (!el) return;
   el.textContent = msg;
   el.style.display = 'block';
-  setTimeout(() => { el.style.display = 'none'; }, dur);
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => { el.style.display = 'none'; }, dur);
 }
 
 // 認証
 function checkLogin() {
   const stored = sessionStorage.getItem('tf_auth');
-  if (stored === CONFIG.PASSWORD) {
-    A.authed = true;
-    return true;
-  }
+  if (stored === CONFIG.PASSWORD) { A.authed = true; return true; }
   return false;
 }
-
 function doLogin() {
   const pass = document.getElementById('loginPass').value;
   if (pass === CONFIG.PASSWORD) {
@@ -98,49 +76,39 @@ function doLogin() {
     document.getElementById('loginPass').focus();
   }
 }
-
 function doLogout() {
+  stopAutoSync();
   sessionStorage.removeItem('tf_auth');
   location.reload();
 }
 
 // データ保存
 async function saveAll() {
-  await DB.save('workspaces', A.workspaces);
-  await DB.save('projects', A.projects);
-  await DB.save('tasks', A.tasks);
-  await DB.save('memos', A.memos);
+  await Promise.all([
+    DB.save('workspaces', A.workspaces),
+    DB.save('projects',   A.projects),
+    DB.save('tasks',      A.tasks),
+    DB.save('memos',      A.memos),
+  ]);
 }
-
-async function saveTasks() {
-  await DB.save('tasks', A.tasks);
-}
-async function saveMemos() {
-  await DB.save('memos', A.memos);
-}
+async function saveTasks()      { await DB.save('tasks',      A.tasks); }
+async function saveMemos()      { await DB.save('memos',      A.memos); }
 async function saveWorkspaces() {
   await DB.save('workspaces', A.workspaces);
-  await DB.save('projects', A.projects);
+  await DB.save('projects',   A.projects);
 }
 
 // モーダル
-function openModal(id) {
-  document.getElementById(id).classList.add('show');
-}
-function closeModal(id) {
-  document.getElementById(id).classList.remove('show');
-}
-function closeAll() {
-  ['wsModal','projModal','embModal','confModal'].forEach(closeModal);
-}
-
+function openModal(id)  { document.getElementById(id).classList.add('show'); }
+function closeModal(id) { document.getElementById(id).classList.remove('show'); }
+function closeAll()     { ['wsModal','projModal','embModal','confModal'].forEach(closeModal); }
 function openConf(txt, cb) {
   document.getElementById('confTxt').textContent = txt;
   A.confCb = cb;
   openModal('confModal');
 }
 
-// サイドバー開閉（モバイル）
+// サイドバー
 function openSidebar() {
   document.getElementById('sidebar').classList.add('open');
   document.getElementById('sideOverlay').classList.add('show');
@@ -164,6 +132,62 @@ function renderColorPicker(containerId, colors, selected, onChange) {
   }));
 }
 
+// ===== 自動同期 =====
+async function syncFromCloud(silent = false) {
+  if (!CONFIG.USE_SUPABASE || !navigator.onLine) return;
+  try {
+    const [ws, pr, tk, mo] = await Promise.all([
+      DB.load('workspaces'),
+      DB.load('projects'),
+      DB.load('tasks'),
+      DB.load('memos'),
+    ]);
+    // 変化があった場合だけ再描画
+    const changed =
+      JSON.stringify(ws) !== JSON.stringify(A.workspaces) ||
+      JSON.stringify(pr) !== JSON.stringify(A.projects)   ||
+      JSON.stringify(tk) !== JSON.stringify(A.tasks)      ||
+      JSON.stringify(mo) !== JSON.stringify(A.memos);
+
+    if (changed) {
+      A.workspaces = ws;
+      A.projects   = pr;
+      A.tasks      = tk;
+      A.memos      = mo;
+      if (!A.wsId && ws.length) A.wsId = ws[0].id;
+      render();
+      if (!silent) showToast('データを同期しました', 1500);
+      console.log('🔄 Synced from cloud');
+    }
+  } catch(e) {
+    console.warn('Sync failed:', e);
+  }
+}
+
+function startAutoSync() {
+  if (!CONFIG.USE_SUPABASE) return;
+  // 30秒ごとにクラウドから最新データを取得
+  A.syncInterval = setInterval(() => syncFromCloud(true), 30000);
+  // 画面が表示状態に戻ったときも同期（スマホでアプリを開き直したとき）
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      syncFromCloud(false);
+    }
+  });
+  // オンラインに戻ったときも同期
+  window.addEventListener('online', () => {
+    showToast('オンラインに戻りました。同期中...', 2000);
+    syncFromCloud(false);
+  });
+}
+
+function stopAutoSync() {
+  if (A.syncInterval) {
+    clearInterval(A.syncInterval);
+    A.syncInterval = null;
+  }
+}
+
 // アプリ初期化
 async function initApp() {
   // ローカルからまず即表示
@@ -171,27 +195,12 @@ async function initApp() {
   A.projects   = DB.loadLocalSync('projects');
   A.tasks      = DB.loadLocalSync('tasks');
   A.memos      = DB.loadLocalSync('memos');
-
-  if (A.workspaces.length > 0) {
-    A.wsId = A.workspaces[0].id;
-  }
-
+  if (A.workspaces.length > 0) A.wsId = A.workspaces[0].id;
   render();
 
-  // バックグラウンドでクラウド同期
-  if (CONFIG.USE_SUPABASE) {
-    Promise.all([
-      DB.load('workspaces'),
-      DB.load('projects'),
-      DB.load('tasks'),
-      DB.load('memos'),
-    ]).then(([ws, pr, tk, mo]) => {
-      A.workspaces = ws;
-      A.projects   = pr;
-      A.tasks      = tk;
-      A.memos      = mo;
-      if (!A.wsId && ws.length) A.wsId = ws[0].id;
-      render();
-    }).catch(console.warn);
-  }
+  // クラウドから最新データを取得して再描画
+  await syncFromCloud(true);
+
+  // 自動同期を開始
+  startAutoSync();
 }
