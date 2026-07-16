@@ -1,0 +1,23 @@
+/* ===== タスク編集フォーム ===== */
+.edit-title-inp {
+  width: 100%;
+  font-size: 14px;
+  font-weight: 500;
+  padding: 7px 10px;
+  border: 1.5px solid #3b82f6;
+  border-radius: 8px;
+  background: #fff;
+  color: #1a1a1a;
+  font-family: inherit;
+  outline: none;
+}
+.edit-title-inp:focus {
+  box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+@media (prefers-color-scheme: dark) {
+  .edit-title-inp {
+    background: #2a2a28;
+    color: #e5e5e3;
+    border-color: #3b82f6;
+  }
+}
