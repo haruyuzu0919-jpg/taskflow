@@ -15,7 +15,9 @@ const A = {
   wsId: '',
   view: 'dashboard',
   sf: '', sq: '', tf: '',
-  expId: null, embId: null, ewId: null, epId: null,
+  expId: null,
+  editId: null,   // ← 編集中タスクID
+  embId: null, ewId: null, epId: null,
   activeMemoId: null, memoSearch: '',
   wc: WS_COLORS[1], pc: WS_COLORS[1],
   confCb: null,
@@ -54,7 +56,6 @@ function showToast(msg, dur = 2000) {
   el._timer = setTimeout(() => { el.style.display = 'none'; }, dur);
 }
 
-// 認証
 function checkLogin() {
   const stored = sessionStorage.getItem('tf_auth');
   if (stored === CONFIG.PASSWORD) { A.authed = true; return true; }
@@ -82,7 +83,6 @@ function doLogout() {
   location.reload();
 }
 
-// データ保存
 async function saveAll() {
   await Promise.all([
     DB.save('workspaces', A.workspaces),
@@ -98,7 +98,6 @@ async function saveWorkspaces() {
   await DB.save('projects',   A.projects);
 }
 
-// モーダル
 function openModal(id)  { document.getElementById(id).classList.add('show'); }
 function closeModal(id) { document.getElementById(id).classList.remove('show'); }
 function closeAll()     { ['wsModal','projModal','embModal','confModal'].forEach(closeModal); }
@@ -108,7 +107,6 @@ function openConf(txt, cb) {
   openModal('confModal');
 }
 
-// サイドバー
 function openSidebar() {
   document.getElementById('sidebar').classList.add('open');
   document.getElementById('sideOverlay').classList.add('show');
@@ -118,7 +116,6 @@ function closeSidebar() {
   document.getElementById('sideOverlay').classList.remove('show');
 }
 
-// カラーピッカー
 function renderColorPicker(containerId, colors, selected, onChange) {
   const el = document.getElementById(containerId);
   if (!el) return;
@@ -132,7 +129,6 @@ function renderColorPicker(containerId, colors, selected, onChange) {
   }));
 }
 
-// ===== 自動同期 =====
 async function syncFromCloud(silent = false) {
   if (!CONFIG.USE_SUPABASE || !navigator.onLine) return;
   try {
@@ -142,65 +138,42 @@ async function syncFromCloud(silent = false) {
       DB.load('tasks'),
       DB.load('memos'),
     ]);
-    // 変化があった場合だけ再描画
     const changed =
       JSON.stringify(ws) !== JSON.stringify(A.workspaces) ||
       JSON.stringify(pr) !== JSON.stringify(A.projects)   ||
       JSON.stringify(tk) !== JSON.stringify(A.tasks)      ||
       JSON.stringify(mo) !== JSON.stringify(A.memos);
-
     if (changed) {
-      A.workspaces = ws;
-      A.projects   = pr;
-      A.tasks      = tk;
-      A.memos      = mo;
+      A.workspaces = ws; A.projects = pr; A.tasks = tk; A.memos = mo;
       if (!A.wsId && ws.length) A.wsId = ws[0].id;
       render();
       if (!silent) showToast('データを同期しました', 1500);
-      console.log('🔄 Synced from cloud');
     }
-  } catch(e) {
-    console.warn('Sync failed:', e);
-  }
+  } catch(e) { console.warn('Sync failed:', e); }
 }
 
 function startAutoSync() {
   if (!CONFIG.USE_SUPABASE) return;
-  // 30秒ごとにクラウドから最新データを取得
   A.syncInterval = setInterval(() => syncFromCloud(true), 30000);
-  // 画面が表示状態に戻ったときも同期（スマホでアプリを開き直したとき）
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible') {
-      syncFromCloud(false);
-    }
+    if (document.visibilityState === 'visible') syncFromCloud(false);
   });
-  // オンラインに戻ったときも同期
   window.addEventListener('online', () => {
     showToast('オンラインに戻りました。同期中...', 2000);
     syncFromCloud(false);
   });
 }
-
 function stopAutoSync() {
-  if (A.syncInterval) {
-    clearInterval(A.syncInterval);
-    A.syncInterval = null;
-  }
+  if (A.syncInterval) { clearInterval(A.syncInterval); A.syncInterval = null; }
 }
 
-// アプリ初期化
 async function initApp() {
-  // ローカルからまず即表示
   A.workspaces = DB.loadLocalSync('workspaces');
   A.projects   = DB.loadLocalSync('projects');
   A.tasks      = DB.loadLocalSync('tasks');
   A.memos      = DB.loadLocalSync('memos');
   if (A.workspaces.length > 0) A.wsId = A.workspaces[0].id;
   render();
-
-  // クラウドから最新データを取得して再描画
   await syncFromCloud(true);
-
-  // 自動同期を開始
   startAutoSync();
 }
