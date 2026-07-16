@@ -1,5 +1,5 @@
 /**
- * 描画ロジック
+ * 描画ロジック（タスク編集機能付き）
  */
 
 // ===== サイドバー =====
@@ -16,14 +16,12 @@ function renderWsList() {
       </span>
     </button>`
   ).join('');
-
   el.querySelectorAll('[data-wid]').forEach(b => {
     b.addEventListener('click', e => {
       if (e.target.closest('[data-we],[data-wd]')) return;
       A.wsId = b.dataset.wid;
       A.expId = null; A.sf = ''; A.sq = ''; A.tf = ''; A.activeMemoId = null;
-      closeSidebar();
-      render();
+      closeSidebar(); render();
     });
   });
   el.querySelectorAll('[data-we]').forEach(b => b.addEventListener('click', e => { e.stopPropagation(); openWsModal(b.dataset.we); }));
@@ -57,7 +55,6 @@ function renderProjList() {
         </div>`
       ).join('')
     : '<div style="font-size:12px;color:#bbb;padding:3px 8px">プロジェクトなし</div>';
-
   el.querySelectorAll('[data-pe]').forEach(b => b.addEventListener('click', () => openProjModal(b.dataset.pe)));
   el.querySelectorAll('[data-pd]').forEach(b => b.addEventListener('click', () => {
     const p = A.projects.find(x => x.id === b.dataset.pd);
@@ -71,8 +68,8 @@ function renderProjList() {
 function updateBadges() {
   const el = id => document.getElementById(id);
   if (el('memoBdg')) el('memoBdg').textContent = A.memos.filter(m => m.wsId === A.wsId).length;
-  if (el('favBdg')) el('favBdg').textContent = A.tasks.filter(t => t.wsId === A.wsId && t.fav).length;
-  if (el('pinBdg')) el('pinBdg').textContent = A.tasks.filter(t => t.wsId === A.wsId && t.pin).length;
+  if (el('favBdg'))  el('favBdg').textContent  = A.tasks.filter(t => t.wsId === A.wsId && t.fav).length;
+  if (el('pinBdg'))  el('pinBdg').textContent  = A.tasks.filter(t => t.wsId === A.wsId && t.pin).length;
 }
 
 // ===== 埋め込み・ファイル =====
@@ -88,15 +85,50 @@ function renderEmbeds(task) {
 
 function renderFiles(task) {
   if (!task.files || !task.files.length) return '';
-  return `<div class="fa">${(task.files).map((f, i) =>
+  return `<div class="fa">${task.files.map((f, i) =>
     `<span class="fc"><i class="ti ti-file"></i>${esc(f.name)}<button data-df="${task.id}-${i}" style="background:none;border:none;cursor:pointer;color:#aaa;padding:0 0 0 4px;font-size:12px;display:flex;align-items:center;font-family:inherit"><i class="ti ti-x"></i></button></span>`
   ).join('')}</div>`;
 }
 
 // ===== タスクカード =====
 function taskCard(task) {
-  const exp = A.expId === task.id;
+  const exp  = A.expId === task.id;
+  const edit = A.editId === task.id;
   const over = task.date && task.date < TODAY && task.status !== 'done';
+
+  // 編集モード
+  if (edit) {
+    return `<div class="tc exp" id="tc-${task.id}">
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <input class="edit-title-inp" data-etitle="${task.id}" value="${esc(task.title)}" placeholder="タスク名" autocomplete="off"/>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+          <select class="fld" data-etag="${task.id}">
+            <option value="blue"  ${task.tag==='blue'  ?'selected':''}>開発</option>
+            <option value="amber" ${task.tag==='amber' ?'selected':''}>マーケ</option>
+            <option value="red"   ${task.tag==='red'   ?'selected':''}>急ぎ</option>
+            <option value="green" ${task.tag==='green' ?'selected':''}>完了</option>
+            <option value="gray"  ${task.tag==='gray'  ?'selected':''}>その他</option>
+          </select>
+          <select class="fld" data-est="${task.id}">
+            ${['todo','wip','review','done','hold'].map(s=>`<option value="${s}"${task.status===s?' selected':''}>${SL[s]}</option>`).join('')}
+          </select>
+          <select class="fld" data-erep="${task.id}">
+            <option value="none"   ${task.repeat==='none'   ?'selected':''}>繰り返しなし</option>
+            <option value="daily"  ${task.repeat==='daily'  ?'selected':''}>毎日</option>
+            <option value="weekly" ${task.repeat==='weekly' ?'selected':''}>毎週</option>
+            <option value="monthly"${task.repeat==='monthly'?'selected':''}>毎月</option>
+          </select>
+          <input type="date" class="fld" data-edate="${task.id}" value="${esc(task.date||'')}"/>
+        </div>
+        <div style="display:flex;gap:6px;justify-content:flex-end">
+          <button class="btn" data-ecancel="${task.id}">キャンセル</button>
+          <button class="btn btnp" data-esave="${task.id}">保存する</button>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // 通常表示
   return `<div class="tc${task.pin ? ' pin-t' : ''}${task.fav ? ' fav-t' : ''} ${exp ? 'exp' : ''}" id="tc-${task.id}">
     <div class="tr">
       <div class="chk${task.status === 'done' ? ' done' : ''}" data-chk="${task.id}" role="checkbox" aria-checked="${task.status === 'done'}" tabindex="0">${task.status === 'done' ? '<i class="ti ti-check"></i>' : ''}</div>
@@ -110,6 +142,7 @@ function taskCard(task) {
         </div>
       </div>
       <div class="ta">
+        <button class="ib" data-fedit="${task.id}" aria-label="編集" title="編集"><i class="ti ti-pencil"></i></button>
         <button class="ib" data-fav="${task.id}" aria-label="お気に入り" style="${task.fav ? 'color:#f59e0b' : ''}"><i class="ti ti-star"></i></button>
         <button class="ib" data-pin="${task.id}" aria-label="ピン留め" style="${task.pin ? 'color:#3b82f6' : ''}"><i class="ti ti-pin"></i></button>
         <button class="ib del" data-del="${task.id}" aria-label="削除"><i class="ti ti-trash"></i></button>
@@ -123,10 +156,10 @@ function taskCard(task) {
         </select>
         <label style="font-size:11px;color:#aaa">繰り返し</label>
         <select class="fld" data-rep="${task.id}" style="font-size:11px;padding:3px 6px">
-          <option value="none"${task.repeat === 'none' ? ' selected' : ''}>なし</option>
-          <option value="daily"${task.repeat === 'daily' ? ' selected' : ''}>毎日</option>
-          <option value="weekly"${task.repeat === 'weekly' ? ' selected' : ''}>毎週</option>
-          <option value="monthly"${task.repeat === 'monthly' ? ' selected' : ''}>毎月</option>
+          <option value="none"   ${task.repeat==='none'   ?'selected':''}>なし</option>
+          <option value="daily"  ${task.repeat==='daily'  ?'selected':''}>毎日</option>
+          <option value="weekly" ${task.repeat==='weekly' ?'selected':''}>毎週</option>
+          <option value="monthly"${task.repeat==='monthly'?'selected':''}>毎月</option>
         </select>
       </div>
       ${renderEmbeds(task)}
@@ -194,7 +227,6 @@ function renderCalendar() {
   return h + '</div>';
 }
 
-// ===== お気に入り / ピン留め =====
 function renderFav() {
   const f = ftasks(A.tasks.filter(t => t.wsId === A.wsId && t.fav));
   return f.length ? `<div class="task-list">${f.map(taskCard).join('')}</div>` : `<div class="es"><i class="ti ti-star"></i>お気に入りがありません<br><span style="font-size:12px">タスクの☆アイコンから追加</span></div>`;
@@ -259,13 +291,10 @@ function renderMemo() {
 function bindMemoEvents() {
   const ms = document.getElementById('memoSearch');
   if (ms) { ms.value = A.memoSearch; ms.addEventListener('input', () => { A.memoSearch = ms.value; renderMain(); }); }
-
   document.querySelectorAll('[data-mid]').forEach(el => el.addEventListener('click', () => { A.activeMemoId = el.dataset.mid; renderMain(); }));
-
   const mt = document.getElementById('memoTitle');
   const mb = document.getElementById('memoBody');
   const del = document.getElementById('delMemo');
-
   if (mt) mt.addEventListener('input', () => {
     const m = A.memos.find(x => x.id === A.activeMemoId);
     if (m) { m.title = mt.value; m.updatedAt = TODAY; }
@@ -286,13 +315,11 @@ function bindMemoEvents() {
       saveMemos(); renderMain();
     });
   });
-
   document.querySelectorAll('[data-mc]').forEach(btn => btn.addEventListener('click', () => {
     const m = A.memos.find(x => x.id === A.activeMemoId);
     if (m) { m.color = btn.dataset.mc; }
     saveMemos(); renderMain();
   }));
-
   const tg = document.getElementById('memoTag');
   if (tg) tg.addEventListener('input', () => {
     const m = A.memos.find(x => x.id === A.activeMemoId);
@@ -318,38 +345,28 @@ function render() {
 function renderMain() {
   const mc = document.getElementById('mainContent');
   if (!mc) return;
-
   const tb = document.getElementById('tabBar');
   const fb = document.getElementById('filterBar');
   const ta = document.getElementById('topActions');
-
   const showFilter = ['dashboard','favorites','pinned'].includes(A.view);
   if (tb) tb.style.display = A.view === 'dashboard' ? 'flex' : 'none';
   if (fb) fb.style.display = showFilter ? 'flex' : 'none';
-
   const TITLES = { dashboard: aw().name + ' のダッシュボード', calendar:'カレンダー', memo:'メモ', favorites:'お気に入り', pinned:'ピン留め' };
   const topEl = document.getElementById('topTitle');
   if (topEl) topEl.textContent = TITLES[A.view] || 'ダッシュボード';
-
   if (ta) {
     if (A.view === 'dashboard') ta.innerHTML = '<button class="btn btnp" id="newTaskBtn"><i class="ti ti-plus"></i>新しいタスク</button>';
     else if (A.view === 'memo') ta.innerHTML = '<button class="btn btnp" id="newMemoBtn"><i class="ti ti-plus"></i>新しいメモ</button>';
     else ta.innerHTML = '';
   }
-
-  // ナビのアクティブ状態
   document.querySelectorAll('.ni[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === A.view));
   document.querySelectorAll('.tab').forEach(t => t.classList.toggle('on', t.dataset.s === A.sf));
   document.querySelectorAll('.bn-item[data-view]').forEach(n => n.classList.toggle('active', n.dataset.view === A.view));
-
-  // コンテンツ描画
   if (A.view === 'dashboard') mc.innerHTML = renderDashboard();
   else if (A.view === 'calendar') mc.innerHTML = renderCalendar();
   else if (A.view === 'memo') mc.innerHTML = renderMemo();
   else if (A.view === 'favorites') mc.innerHTML = renderFav();
   else if (A.view === 'pinned') mc.innerHTML = renderPinned();
-
-  // イベントバインド
   if (A.view === 'memo') bindMemoEvents();
   else bindTaskEvents();
   bindTopbarEvents();
@@ -371,11 +388,9 @@ function bindTopbarEvents() {
       f.classList.add('show');
       const nd = document.getElementById('ntDt');
       if (nd) nd.value = TODAY;
-      const nt = document.getElementById('ntT');
-      if (nt) { setTimeout(() => nt.focus(), 50); }
+      setTimeout(() => { const nt = document.getElementById('ntT'); if (nt) nt.focus(); }, 50);
     }
   });
-
   const nmb = document.getElementById('newMemoBtn');
   if (nmb) nmb.addEventListener('click', () => {
     const m = { id: uid(), wsId: A.wsId, title: '', body: '', color: '#ffffff', tag: '', updatedAt: TODAY };
@@ -384,7 +399,6 @@ function bindTopbarEvents() {
     saveMemos(); renderMain();
     setTimeout(() => { const t = document.getElementById('memoTitle'); if (t) t.focus(); }, 50);
   });
-
   const si = document.getElementById('searchInp');
   if (si) { si.value = A.sq; si.addEventListener('input', () => { A.sq = si.value; renderMain(); }); }
   const ft = document.getElementById('filterTag');
@@ -395,18 +409,76 @@ function bindTaskEvents() {
   const mc = document.getElementById('mainContent');
   if (!mc) return;
 
-  mc.querySelectorAll('[data-exp]').forEach(el => el.addEventListener('click', () => { A.expId = A.expId === el.dataset.exp ? null : el.dataset.exp; renderMain(); }));
+  // タイトルクリックで展開
+  mc.querySelectorAll('[data-exp]').forEach(el => el.addEventListener('click', () => {
+    A.expId  = A.expId  === el.dataset.exp  ? null : el.dataset.exp;
+    A.editId = null;
+    renderMain();
+  }));
+
+  // ✏️ 編集ボタン
+  mc.querySelectorAll('[data-fedit]').forEach(el => el.addEventListener('click', () => {
+    A.editId = A.editId === el.dataset.fedit ? null : el.dataset.fedit;
+    A.expId  = null;
+    renderMain();
+    setTimeout(() => {
+      const inp = document.querySelector(`[data-etitle="${el.dataset.fedit}"]`);
+      if (inp) { inp.focus(); inp.select(); }
+    }, 50);
+  }));
+
+  // 編集キャンセル
+  mc.querySelectorAll('[data-ecancel]').forEach(el => el.addEventListener('click', () => {
+    A.editId = null; renderMain();
+  }));
+
+  // 編集保存
+  mc.querySelectorAll('[data-esave]').forEach(el => el.addEventListener('click', () => {
+    const id    = el.dataset.esave;
+    const t     = A.tasks.find(x => x.id === id);
+    if (!t) return;
+    const titleInp = document.querySelector(`[data-etitle="${id}"]`);
+    const tagSel   = document.querySelector(`[data-etag="${id}"]`);
+    const stSel    = document.querySelector(`[data-est="${id}"]`);
+    const repSel   = document.querySelector(`[data-erep="${id}"]`);
+    const dateInp  = document.querySelector(`[data-edate="${id}"]`);
+    if (titleInp) t.title  = titleInp.value.trim() || t.title;
+    if (tagSel)   t.tag    = tagSel.value;
+    if (stSel)    t.status = stSel.value;
+    if (repSel)   t.repeat = repSel.value;
+    if (dateInp)  t.date   = dateInp.value;
+    A.editId = null;
+    saveTasks(); renderMain();
+    showToast('タスクを更新しました');
+  }));
+
+  // Enterキーで保存、Escキーでキャンセル
+  mc.querySelectorAll('.edit-title-inp').forEach(inp => {
+    inp.addEventListener('keydown', e => {
+      if (e.key === 'Enter') {
+        const btn = document.querySelector(`[data-esave="${inp.dataset.etitle}"]`);
+        if (btn) btn.click();
+      }
+      if (e.key === 'Escape') {
+        A.editId = null; renderMain();
+      }
+    });
+  });
+
+  // チェック
   mc.querySelectorAll('[data-chk]').forEach(el => {
     const toggle = () => { const t = A.tasks.find(x => x.id === el.dataset.chk); if (t) t.status = t.status === 'done' ? 'todo' : 'done'; saveTasks(); renderMain(); };
     el.addEventListener('click', toggle);
     el.addEventListener('keydown', e => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); toggle(); } });
   });
+
   mc.querySelectorAll('[data-fav]').forEach(el => el.addEventListener('click', () => { const t = A.tasks.find(x => x.id === el.dataset.fav); if (t) t.fav = !t.fav; saveTasks(); renderMain(); }));
   mc.querySelectorAll('[data-pin]').forEach(el => el.addEventListener('click', () => { const t = A.tasks.find(x => x.id === el.dataset.pin); if (t) t.pin = !t.pin; saveTasks(); renderMain(); }));
   mc.querySelectorAll('[data-del]').forEach(el => el.addEventListener('click', () => {
     openConf('このタスクを削除しますか？', () => {
       A.tasks = A.tasks.filter(x => x.id !== el.dataset.del);
-      if (A.expId === el.dataset.del) A.expId = null;
+      if (A.expId  === el.dataset.del) A.expId  = null;
+      if (A.editId === el.dataset.del) A.editId = null;
       saveTasks(); renderMain();
     });
   }));
@@ -463,10 +535,13 @@ function bindTaskEvents() {
   const cn = document.getElementById('cnlTask');
   if (cn) cn.addEventListener('click', () => document.getElementById('addTaskForm').classList.remove('show'));
   const nt = document.getElementById('ntT');
-  if (nt) nt.addEventListener('keydown', e => { if (e.key === 'Enter') document.getElementById('svTask')?.click(); if (e.key === 'Escape') document.getElementById('cnlTask')?.click(); });
+  if (nt) nt.addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('svTask')?.click();
+    if (e.key === 'Escape') document.getElementById('cnlTask')?.click();
+  });
 }
 
-// ===== ワークスペースモーダル =====
+// ===== ワークスペース・プロジェクトモーダル =====
 function openWsModal(editId) {
   A.ewId = editId || null;
   const w = editId ? A.workspaces.find(x => x.id === editId) : null;
